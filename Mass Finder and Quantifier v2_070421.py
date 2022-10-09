@@ -176,7 +176,10 @@ class FileSelection(tk.Frame):
             
             #abbreviate msalign MS1 filenames for graphing display
             for i in range(1,len(App.msalign_filearray),2):
-                temp_name=App.msalign_filearray[i].split("/")[-1]
+                #split the filename into a list at "/"s, ie "Sample/hello/world"->["Sample","hello","world"]
+                file_path_ls=App.msalign_filearray[i].split("/")
+                #take the last item of the above:
+                temp_name=file_path_ls[-1]
                 SearchParams.abrv_filenames.append(temp_name)            
             
             self.controller.show_frame(SearchParams)
