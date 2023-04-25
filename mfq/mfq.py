@@ -101,7 +101,7 @@ from bokeh.transform import dodge
 from tkinter import filedialog
     # filedialog: provides a set of dialogs to use when working with file, such as open, save, etc.
         # used to upload & open ms1ft .csv files
-from tktooltip import ToolTip
+# from tktooltip import ToolTip
 from idlelib.tooltip import Hovertip
 import math
 
@@ -127,7 +127,7 @@ class App(tk.Tk):
     def __init__(self, *args, **kwargs):
         # initializing App
         tk.Tk.__init__(self, *args, **kwargs)
-        tk.Tk.wm_title(self,"Mass Finder and Quantifier")       # TO DO: "Mass Finder and Quantifier" or "Spectromass"?
+        tk.Tk.wm_title(self,"Mass Finder and Quantifier")       # "Mass Finder and Quantifier" or "Spectromass"?
 
         # create the Frame the App is contained in (container for App)
         container = tk.Frame(self)
@@ -331,19 +331,14 @@ class FileSelection(tk.Frame):
             
         else:
             # Retrieve file path from upload
-            file_path = filedialog.askopenfilename(title="Please select an MS1 MSALIGN file", filetypes=[('All files','*.*')])
+            file_path = filedialog.askopenfilename(title="Please select an MS1 MSALIGN file", filetypes=[('All files','*.*')])  # Question: Does this still not work on mac?
 
-            # Extract file name from file path
-                # given file_path = './.../.../.../filename.ext',
-                # extract only 'filename.ext' by searching path backwards and stopping at /
-            temp_name = []                      # temp_name will store name as it builds
-            for char in file_path[::-1]:        # step thru each char in reversed file_path
-                if char != '/':
-                    temp_name.append(char)      # append all non-'/' chars to temp_name
-                else:
-                    break                       # stop process at first '/'
-            temp_name.reverse()                 # reverse to get chars in original order
-            ext_filename = ''.join([str(char) for char in temp_name])   # store as string
+            # The abbreviated file name 'filename.msalign' of the uploaded file is extracted from its path '.../.../.../.../filename.msalign'
+            filename = str(file_path)[::-1]        # takes the uploaded file path as a string, reverses it, and saves this to the variable filename
+            for i in range(len(filename)):
+                if filename[i] == '/':
+                    ext_filename = filename[0:i][::-1]    # takes the reversed file path up to the first '/', reversed, and saves this to the variable ext_filename
+                    break
 
             # Once a file has been successfully uploaded, display in app while:
                 # allowing user to relabel each file, usually by group (e.g. 'exp group', 'ctrl group')
@@ -366,7 +361,7 @@ class FileSelection(tk.Frame):
 
                 # changes to FileSelection page
                 FileSelection.filelabel_identities.append(filelabel)
-                FileSelection.group_identities.append(group_label_entry)
+                # FileSelection.group_identities.append(group_label_entry)
                 FileSelection.button_identities.append(removebutton)
                 FileSelection.gridrow += 1
                 App.total_files+=1
@@ -374,10 +369,12 @@ class FileSelection(tk.Frame):
                 # update main array by appending file Label and string (why both?)
                 # msalign_filearray = [Label1, string1, Label2, string2, ...]
                 App.msalign_filearray.append(filelabel)
-                App.msalign_filearray.append(ext_filename)
+                # App.msalign_filearray.append(ext_filename)
+                App.msalign_filearray.append(str(file_path))
 
             # timing start
             start_time = timeit.default_timer()
+            print(App.msalign_filearray)
                 
             # only show "Process Files" button once there are files to process
             # pressing the "Process Files" button calls the lambda populate_entries()
@@ -734,7 +731,7 @@ class SearchParams(tk.Frame):
             # Warning: Overlap between 'Mass Interval' and 'Mass Tolerance'
             # The mass interval must be more than twice as large as the mass tolerance, otherwise one datapoint may be counted towards two neighboring masses of interest. Once we have the above issue fixed we can put this in the same for loop as checking the entries above and won't need  so many if statements.
             if self.mass_range.get() == 1:
-                if (int(SearchParams.entries[1][1].get()) >= math.floor(int(SearchParams.entries[0][3].get())/2)):
+                if (int(SearchParams.entries[1][1].get()) >= math.ceil(int(SearchParams.entries[0][3].get())/2)):
                     mb.showerror("Warning", "Overlap between mass interval and mass tolerance.\nInterval must be more than twice as large as tolerance.")
                     error = True
 
@@ -830,7 +827,7 @@ class SearchParams(tk.Frame):
         scan_ions = []          # ions to perform mass selection on
         temp_array = [0,0,0,0]  # temp array for each scan
         ms1_ions = []           # last in scan array
-        ms1events = 0           # TO DO: do we use this counter at all?
+        ms1events = 0           # Question: Do we use this counter at all?
         convert = []            # file data fills here as it is being converted
         lines = []              # lines/rows of data fill here 
 
@@ -872,7 +869,7 @@ class SearchParams(tk.Frame):
             #
             # (repeat above)
         # So we use these headers (and a temp array) to sort the appropriate data into ms1_ions and scan_ions.
-        # TO DO: Is this the exact format every time? If so we can probably rewrite the following loop to be a bit more efficient.
+        # Question: Is this the exact format every time? If so we can probably rewrite the following loop to be a bit more efficient.
         while (len(lines)-1)>0:
             text = str(lines[0])
             if text.startswith('ID='):
@@ -918,7 +915,7 @@ class SearchParams(tk.Frame):
         start_time = timeit.default_timer()
 
         masses = []
-        input_masses = [0]
+        input_masses = [0]      # question: why?
 
         # Gather entries from parameters in Static Mode
         if self.search_optn.get() == "Static":
@@ -929,26 +926,26 @@ class SearchParams(tk.Frame):
             input_masses = str(SearchParams.entries[4][1].get())        # Masses
             mass_tolerance = float(SearchParams.entries[5][1].get())    # Mass Tolerance (Da)
 
-        # Gather entries from parameters in Dynamic Mode
+        # OR Gather entries from parameters in Dynamic Mode
         if self.search_optn.get() == "Dynamic":
-            scan_min = 0                                                # default to ret time min
-            scan_max = 30000                                            # default to ret time max
+            scan_min = 0                                                # Question: Do we want an entry for this per file?
+            scan_max = 30000                                            # same here
             retention_min = float((SearchParams.dynamic_entries[SearchParams.dynamic_counter][1]).get())
             retention_max = float((SearchParams.dynamic_entries[SearchParams.dynamic_counter+1][1]).get())
             SearchParams.dynamic_counter+=3
-            if self.mass_range.get() == 1:                              # gather 'Search by masses range' data
+            if self.mass_range.get() == 1:                              # gather 'Search by mass range' data
                 min_mass = float(SearchParams.entries[0][1].get())
                 max_mass = float(SearchParams.entries[0][2].get())
                 mass_interval = float(SearchParams.entries[0][3].get())
                 mass_tolerance = float(SearchParams.entries[1][1].get())
-                masses = [min_mass]
-
+                input_masses = [min_mass]
                 temp_mass = min_mass
                 while temp_mass <= max_mass:
                     temp_mass+=mass_interval
-                    masses.append(temp_mass)
-                print('mass range=',masses)
-            else:                                                       # 'Search by masses' not selected
+                    input_masses.append(temp_mass)
+                # print('mass range=',input_masses)
+                input_masses = str(input_masses)                        # not sure
+            else:                                                       # if 'Search by masses' not selected
                 input_masses = str(SearchParams.entries[0][1].get())    # only additional data to gather is
                 mass_tolerance = float(SearchParams.entries[1][1].get())    # Masses and Mass tolerance (Da)
 
@@ -957,8 +954,11 @@ class SearchParams(tk.Frame):
         convert = []
         pool = []
 
+        print('input masses')
+        print(input_masses)
+        print('input masses')
         # convert string masses to float so their data can be used in calculations
-        if type(input_masses[0]) == str:
+        if type(input_masses[0]) == str:                # input_masses = list of masses as strings, why if?
             masses = []
             for idx, val in enumerate(input_masses):
                 if val == ',' or val == ' ':
@@ -1009,19 +1009,13 @@ class SearchParams(tk.Frame):
             # out_file.write("\n")
 
 
-
-    # CURRENT TO DO OVER HERE
-    # MASS_QUANTIFICATION(): Given found_masses, masses, and mass_tolerance arrays
-    # from mass_selection(), calculates intensities of masses and appends these
-    # values to summed_intensities array. These are used to calculate total_intensity,
-    # which is used alongside summed_intesities to calculate percent_intesities,
-    # which contains the ratio of the individual intensities of the masses to the
-    # total intensity. Also contains warning for no masses found (per file).
+    # MASS_QUANTIFICATION(): Uses found_masses, masses, and mass_tolerance arrays to calculate the intensity of each mass of interest (using values from within the specified tolerance), then sums all the intensities and pairs each mass with its percent of the total intensity, to yield the abundance of each mass. This data is saved to App.processedfilearray.
+    # Also contains warning for no masses found (per file).
     def mass_quantification(self,found_masses,masses,mass_tolerance):
         # timing start
         start_time = timeit.default_timer()
 
-        # Start with empty intensity arrays (summed, percent) and 0 total intensity
+        # Initialize intensity information to 0 and empty before performing calculations
         summed_intensities = []
         total_intensity = 0
         percent_intensities = []
@@ -1030,23 +1024,21 @@ class SearchParams(tk.Frame):
         for i in masses:
             intensity = 0
             for j in found_masses:
-                if (j[1] - mass_tolerance) <= i <= (j[1] + mass_tolerance):
+                if (j[1] - mass_tolerance) <= i <= (j[1] + mass_tolerance):     # count masses within range specified by tolerance toward mass of interest
                     intensity = intensity + j[2]
-            summed_intensities.append([i,intensity])
+            summed_intensities.append([i,intensity])                            # summed intensities contains elements (mass, intensity)
 
-        # Total intensity is sum of all summed_intensities
+        # Calculate total intensity (sum of intensities of all masses) in order to determine abundance
         for i in summed_intensities:
             total_intensity = total_intensity + i[1]
 
-        # If total_intensity > 0 we can calculate ratio of individual summed
-        # intensities to total_intensity calculated above. Append these values
-        # to percent_intensities.
+        # If total_intensity > 0 we can calculate the abundance of each mass. Append these values to percent_intensities, containing elements (mass, percent of total intensity in sample).
         if total_intensity > 0:
             for i in summed_intensities:
                 percent_intensities.append([i[0],(i[1]/total_intensity*100)])
 
-            App.processed_filearray.append(percent_intensities) #((mass1,percent1),(mass2,percent2),...)
-        # If total_intensity nonpositive, cannot calculate percentages (div by 0 or meaningless if -).
+            App.processed_filearray.append(percent_intensities)                 #((mass1,percent1),(mass2,percent2),...)
+        # If total_intensity nonpositive, cannot calculate percentages
         else:
             mb.showerror("Warning","No masses found for one or more of the inputted files.")
             self.controller.show_frame(SearchParams)
@@ -1057,6 +1049,7 @@ class SearchParams(tk.Frame):
         # with open("timing_0_mass_quantification.csv", "a") as out_file:             # timing output file for testing
             # out_file.write(str(total_time))
             # out_file.write("\n")
+
 
 
 """
@@ -1303,7 +1296,7 @@ class QCGraphs(tk.Frame):
         offset = 0.25
         for group_data in QCGraphs.calc_avg_stdev:
             group_name = []
-            #adding stdev to avgs to get bar placement on graph (TO DO fix)
+            #adding stdev to avgs to get bar placement on graph
             lower, upper = [], []
             for i in range(len(group_data[1][0])): #average values
                 lower.append(group_data[1][0][i]-group_data[1][1][i]) #average value for a mass i - stdev
