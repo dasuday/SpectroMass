@@ -72,17 +72,18 @@ from tkinter import *                           # remove and test
 from collections.abc import Iterable
     # Iterable: provides abstract base classes that can be used to test whether a class
     # provides a particular interface, so like issubclass() or isinstance()
-from bokeh.models import ColumnDataSource, Whisker, HoverTool, Legend, LegendItem
+from bokeh.models import ColumnDataSource, Whisker, HoverTool, Legend, LegendItem, Select, Panel, Tabs
     # ColumnDataSource: provides data to the glyphs of plot so you can pass in lists, etc.
     # Whisker: adds a whisker for error margins
     # HoverTool: passive inspector tool, for actions to occur when cursor hovering
     # Legend: allows us more advanced control of the legend object provided by bokeh for the graphs
     # LegendItem: set True to have legend visible, False to hide legend
+    # Tabs and Panel: Lets you use panels and tabs for graphs
 from bokeh.plotting import figure, show
     # figure: a function that creates a Figure model, which composes axes, grids, default tools, etc.
     # and includes methods for adding different kinds of glyphs (shapes & things) to a plot
     # show: displays the figure
-from bokeh.layouts import gridplot
+from bokeh.layouts import gridplot, column, row
     # gridplot: a function which arranges bokeh plots in a grid and merges all plot tools into a single
     # toolbar so that each plot int he grid has the same active tool
 from bokeh.io import output_file
@@ -361,7 +362,7 @@ class FileSelection(tk.Frame):
 
                 # changes to FileSelection page
                 FileSelection.filelabel_identities.append(filelabel)
-                # FileSelection.group_identities.append(group_label_entry)
+                FileSelection.group_identities.append(group_label_entry)
                 FileSelection.button_identities.append(removebutton)
                 FileSelection.gridrow += 1
                 App.total_files+=1
@@ -1284,7 +1285,7 @@ class QCGraphs(tk.Frame):
 
         # averaged plot displayed first
         averaged_plot = figure(title="Averaged MS1 Data per Condition", x_axis_label="Mass", y_axis_label="Abundance (%)", tools="pan,box_zoom,wheel_zoom,reset,undo,save", active_drag="box_zoom",
-                               active_scroll="wheel_zoom", x_range=((min(QCGraphs.masses)-100), (max(QCGraphs.masses)+100)),tooltips=TOOLTIPS, width=1080, height=740)
+                               active_scroll="wheel_zoom", x_range=((min(QCGraphs.masses)-100), (max(QCGraphs.masses)+100)),tooltips=TOOLTIPS, width=400)
 
         # convert searched masses to string values for legend
         for i in QCGraphs.masses:
@@ -1323,6 +1324,7 @@ class QCGraphs(tk.Frame):
             color_selection+=1
             offset+=2
 
+        tab = []    
 
         for j in QCGraphs.total_qc_graph_array:                 # where j is each processed msalign file as an array
             idx = QCGraphs.total_qc_graph_array.index(j)        # used to title the graph after the cooresponding filename
@@ -1330,8 +1332,14 @@ class QCGraphs(tk.Frame):
             color_selection = 0
             color_palette = Category20c[20]
 
-            p = figure(title="QC Graph for "+str(SearchParams.abrv_filenames[idx]),x_axis_label="Ret. time(s)", tools="pan,box_zoom,wheel_zoom,reset,undo,save",
-                       active_scroll="wheel_zoom",y_axis_label="Intensity", tooltips=TOOLTIPSQC, active_drag="box_zoom", width=1080, height=740)
+            filename = str(SearchParams.abrv_filenames[idx])[::-1]        # takes the uploaded file path as a string, reverses it, and saves this to the variable filename
+            for i in range(len(filename)):
+                if filename[i] == '/':
+                    ext_filename = filename[0:i][::-1]    # takes the reversed file path up to the first '/', reversed, and saves this to the variable ext_filename
+                    break
+
+            p = figure(title="QC Graph for "+ext_filename,x_axis_label="Ret. time(s)", tools="pan,box_zoom,wheel_zoom,reset,undo,save",
+                       active_scroll="wheel_zoom",y_axis_label="Intensity", tooltips=TOOLTIPSQC, active_drag="box_zoom")
             offset = .25
             v=[]
             for i in QCGraphs.masses:                           # for each mass... is this ret time?
@@ -1369,15 +1377,19 @@ class QCGraphs(tk.Frame):
             p.add_layout(legend,'right')
             p.legend.click_policy="hide"
             qc_plots.append(p)
+            tab_temp = Panel(child=p, title=ext_filename)
+            tab.append(tab_temp)
             del p
-
+        
         date = datetime.today().strftime('%Y%m%d_%H%M%S')
         filename = "MS1_quant_graphs"+"_"+date+".html"      # names qcgraph file by date
         output_file(filename)                               # from bokeh, outputs file containing quant graphs \
 
         # make a grid
-        grid = gridplot([[averaged_plot,None],qc_plots], merge_tools = False, toolbar_location="left", width=800, height=500)
-        show(grid)
+
+        #grid = gridplot([averaged_plot,Tabs(tabs=tab, tabs_location='left')], merge_tools = False, toolbar_location="left", width=800, height=500)
+        layout = row(averaged_plot,Tabs(tabs=tab, tabs_location='above'),sizing_mode = "stretch_both")
+        show(layout)
 
         ''' TO DO once "New Analysis" button fixed, move this there '''
         # clear out graphing data
