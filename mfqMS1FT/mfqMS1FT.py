@@ -41,7 +41,7 @@ from matplotlib import style
 style.use('ggplot')
     # style: used to customized appearance of plots,
     # ggplot: a style that emulates the ggplot package for R
-import os, time     # -----------------------------------------------------------------> import time?
+import os, time, os.path     # -----------------------------------------------------------------> import time?
     # os: "provides a portable way of using operation system dependent functionality"
     # i'm guessing these are just used to access the date&time on the computer, for plotting?
 import statistics
@@ -72,18 +72,20 @@ from tkinter import *                           # remove and test
 from collections.abc import Iterable
     # Iterable: provides abstract base classes that can be used to test whether a class
     # provides a particular interface, so like issubclass() or isinstance()
-from bokeh.models import ColumnDataSource, Whisker, HoverTool, Legend, LegendItem, Select, Panel, Tabs
+from bokeh.models import ColumnDataSource, Whisker, HoverTool, Legend, LegendItem, Select, Panel, Tabs, Div, BasicTicker, ColorBar, CustomJS, TapTool, LogColorMapper, PrintfTickFormatter
     # ColumnDataSource: provides data to the glyphs of plot so you can pass in lists, etc.
     # Whisker: adds a whisker for error margins
     # HoverTool: passive inspector tool, for actions to occur when cursor hovering
     # Legend: allows us more advanced control of the legend object provided by bokeh for the graphs
     # LegendItem: set True to have legend visible, False to hide legend
     # Tabs and Panel: Lets you use panels and tabs for graphs
-from bokeh.plotting import figure, show
+    # Div: corresponds to an HTML <div> element
+from bokeh.plotting import figure, show, curdoc
     # figure: a function that creates a Figure model, which composes axes, grids, default tools, etc.
     # and includes methods for adding different kinds of glyphs (shapes & things) to a plot
     # show: displays the figure
-from bokeh.layouts import gridplot, column, row
+    # curdoc:
+from bokeh.layouts import gridplot, column, row, layout
     # gridplot: a function which arranges bokeh plots in a grid and merges all plot tools into a single
     # toolbar so that each plot int he grid has the same active tool
 from bokeh.io import output_file
@@ -92,19 +94,25 @@ from bokeh.io import output_file
 from bokeh.palettes import Category20b, Category20c
     # Category20b: 4 purple, 4 green, 4 brown, 4 red, 4 pink
     # Category20c: 4 blue, 4 orange, 4 green, 4 purple, 4 grey
-from bokeh.transform import dodge
+from bokeh.transform import dodge, transform
     # dodge: creates a DataSpec dict that applies a client-side Dodge transformation to a
     # ColumnDataSoure column. has parameters:
         # field_name (str) - a field name to configure DataSpec with
         # value (float) - the fixed offset to add to column data
         # range (Range, optional) - a range to use for computing synthetic coordinates when necessary,
         # e.g. a FactorRange when the column data is categorical (not the fun kind)
+    # transform:
+from bokeh.resources import INLINE
+    # INLINE:
+from bokeh.events import Tap
+    # Tap:
 from tkinter import filedialog
     # filedialog: provides a set of dialogs to use when working with file, such as open, save, etc.
         # used to upload & open ms1ft .csv files
 # from tktooltip import ToolTip
 from idlelib.tooltip import Hovertip
 import math
+from pathlib import Path
 
 LARGE_FONT= ("Verdana", 12)
 
@@ -122,6 +130,7 @@ class App(tk.Tk):
     msalign_filearray = []
     processed_filearray = []
     expgroup = []
+    ms1ft_filenames = []
     total_files = 0
     Test = True                 # shows test button, which performs a test run of n identical files (WIP)
 
@@ -340,6 +349,10 @@ class FileSelection(tk.Frame):
                 if filename[i] == '/':
                     ext_filename = filename[0:i][::-1]    # takes the reversed file path up to the first '/', reversed, and saves this to the variable ext_filename
                     break
+            ms1ft_filename = str(file_path)[:-12]+'.ms1ft'
+            App.ms1ft_filenames.append(ms1ft_filename)
+            
+            print('ms1ft_filename',ms1ft_filename)
 
             # Once a file has been successfully uploaded, display in app while:
                 # allowing user to relabel each file, usually by group (e.g. 'exp group', 'ctrl group')
@@ -1388,8 +1401,15 @@ class QCGraphs(tk.Frame):
         # make a grid
 
         #grid = gridplot([averaged_plot,Tabs(tabs=tab, tabs_location='left')], merge_tools = False, toolbar_location="left", width=800, height=500)
-        layout = row(averaged_plot,Tabs(tabs=tab, tabs_location='above'),sizing_mode = "stretch_both")
+
+        div = Div(text='Testing')
+        
+        
+        layout = row(averaged_plot,Tabs(tabs=tab, tabs_location='above'), Tabs(tabs=VisualizeMS1FT.make_ms1ft_graphs(ext_filename),tabs_location='above'), sizing_mode = "stretch_width")
         show(layout)
+
+
+        #VisualizeMS1FT.make_ms1ft_graphs()
 
         ''' TO DO once "New Analysis" button fixed, move this there '''
         # clear out graphing data
@@ -1406,8 +1426,117 @@ class QCGraphs(tk.Frame):
         # QC Graph output is last step of app but don't close app, just return
         return
 
+class VisualizeMS1FT():
+    
+    print('done')
+
+    def make_ms1ft_graphs(ext_filename):
+        print('called')
+        ms1ft_graphs = []
+        for file in App.ms1ft_filenames:
+            print(file)
+            if os.path.isfile(file):
+                print('found file')
+                df_ms1ft = pd.read_csv(file,sep='\t')     # reads input file (tab delimited) into a pandas dataframe
+                if df_ms1ft.columns[0] != "FeatureID":          # to make sure the file was formatted correctly, check that the first column heading is "FeatureID"
+                    mb.showerror("File Error", "Check the MS1FT file: Expected 'FeatureID' as first column!") # question: is this the only column we should check?
+                    sys.exit()
+                else:
+                    df_ms1ft = df_ms1ft.sort_values(by='MonoMass').set_index(keys='MonoMass')   # sets the 'MonoMass' datapoint as the key for its corresponding data, and sorts the dataframe by it
+
+                output_file("featuremap_"+ext_filename+".html", mode='inline')
+                VisualizeMS1FT.envelope_histogram(df_ms1ft)                                     # forms envelope histogram out of sorted dataframe containing ms1ft file data
+
+                source = ColumnDataSource(df_ms1ft)
+                source2 = ColumnDataSource(data=dict(x=[], y=[]))
+
+                colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
+                mapper = LogColorMapper(palette=colors, low=df_ms1ft['Abundance'].min(), high=df_ms1ft['Abundance'].max())
+
+                p = figure(title="Feature Map of "+ext_filename,
+                           x_range=(0,df_ms1ft['MaxElutionTime'].max()+1), y_range=(0,30000), #y_range=(0,df_ms1ft.index.max()+1) = this will scale to largest mass identified, really impratical so i set to 30,000
+                           toolbar_location="right",  x_axis_location="below",active_drag="box_zoom",active_scroll="wheel_zoom",)
+
+                iso_distrib = figure(width = 500, height = 400, title="Isotopic Distribution",x_axis_label="C13", tools="pan,box_zoom,wheel_zoom,reset,undo,save",
+                                    active_scroll="wheel_zoom",y_axis_label="Rel. Abundance", active_drag="box_zoom")
+                 
+                z = iso_distrib.vbar(x='x', width=0.5, bottom=0, top='y', color="red", source=source2)
+
+
+                mass = p.rect(x="MinElutionTime", y="MonoMass", width='ElutionLength', height=10, source=source,
+                       line_color=None, fill_color=transform('Abundance', mapper))
+
+                p.add_tools(TapTool())
+
+                p.js_on_event(Tap, CustomJS(args=dict(source=source, source2=source2,title=iso_distrib.title), code="""
+                    // get data source from Callback args
+                    let data = Object.assign({}, source.data);
+                    source2.data.x = data.C13[source.selected.indices];
+                    source2.data.y = data.IsoAbd[source.selected.indices];
+                    title.text = 'Isotopic Distribution for: '+(new String(data.MonoMass[source.selected.indices]));
+                    source2.change.emit();
+                """)
+                )
+
+                color_bar = ColorBar(color_mapper=mapper, title="Log Abundance")
+
+                p.add_layout(color_bar, 'right')
+                p.axis.axis_line_color = None
+                p.axis.major_tick_line_color = None
+                p.xaxis.axis_label = 'Retention Time (min)'
+                p.yaxis.axis_label = 'Monoisotopic Mass'
+                p.axis.major_label_text_font_size = "20px"
+                p.axis.major_label_standoff = 0
+                p.xaxis.major_label_orientation = 1.0
+                p.axis.axis_label_text_font_size = "20px"
+
+                temp = layout([p, iso_distrib])
+                tab = Panel(child=temp, title=ext_filename)
+                ms1ft_graphs.append(tab)
+                
+            else:
+                print('not found!') 
+        return ms1ft_graphs
+
+    # Function Name: Envelope Histogram
+    # Input: 1 list (or pandas dataframe?)
+    # Output: updates input, no output?
+    # Description: This function takes a list (of the data read from the input ms1ft file) and 
+    def envelope_histogram(df_ms1ft):
+        envelope = list(df_ms1ft['Envelope'])
+        carb_isotope = []
+        carb_abundance = []
+        convert = []
+        pool_c13 = []
+        pool_isoabd = []
+         
+        for distribution in envelope:
+            for idx, val in enumerate(distribution):
+                if val == ',': 
+                    link = "".join(convert)
+                    carb_isotope.append(int(link))
+                    convert = []
+                elif val == ';' or idx == (len(distribution)-1): # older versions of ms1ft have Envelopes that end with ';' vs. an empty space
+                    link = "".join(convert)
+                    carb_abundance.append(float(link))
+                    convert = []
+                else:
+                    convert.append(val)
+            
+            pool_c13.append(carb_isotope)
+            pool_isoabd.append(carb_abundance)
+            carb_isotope,carb_abundance = [],[]
+        df_ms1ft['C13'],df_ms1ft['IsoAbd'] = pool_c13, pool_isoabd
+
+
 print('Class\t\t Function \t\t\t Runtime (s)')
 print('-------\t\t ----------\t\t\t -----------')
+
+
+
+
+
+
 
 app = App()
 app.mainloop()

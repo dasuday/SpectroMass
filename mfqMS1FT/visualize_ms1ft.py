@@ -8,7 +8,7 @@ from bokeh.models import (BasicTicker, ColorBar, ColumnDataSource, CustomJS, Tap
                           LogColorMapper, PrintfTickFormatter, HoverTool)
 from bokeh.events import Tap
 from bokeh.plotting import figure, curdoc
-from bokeh.sampledata.unemployment1948 import data
+#from bokeh.sampledata.unemployment1948 import data
 from bokeh.transform import transform
 from bokeh.layouts import gridplot
 from bokeh.resources import INLINE
