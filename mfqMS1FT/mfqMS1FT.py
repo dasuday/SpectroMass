@@ -72,7 +72,7 @@ from tkinter import *                           # remove and test
 from collections.abc import Iterable
     # Iterable: provides abstract base classes that can be used to test whether a class
     # provides a particular interface, so like issubclass() or isinstance()
-from bokeh.models import ColumnDataSource, Whisker, HoverTool, Legend, LegendItem, Select, Panel, Tabs, Div, BasicTicker, ColorBar, CustomJS, TapTool, LogColorMapper, PrintfTickFormatter
+from bokeh.models import ColumnDataSource, Whisker, HoverTool, Legend, LegendItem, Tabs, Div, BasicTicker, ColorBar, CustomJS, TapTool, LogColorMapper, PrintfTickFormatter, TabPanel
     # ColumnDataSource: provides data to the glyphs of plot so you can pass in lists, etc.
     # Whisker: adds a whisker for error margins
     # HoverTool: passive inspector tool, for actions to occur when cursor hovering
@@ -129,6 +129,7 @@ The functions new_analysis() and test_app() are also defined here, but both are 
 class App(tk.Tk):   
     msalign_filearray = []
     processed_filearray = []
+    shortened_filenames = []
     expgroup = []
     ms1ft_filenames = []
     total_files = 0
@@ -341,66 +342,69 @@ class FileSelection(tk.Frame):
             
         else:
             # Retrieve file path from upload
-            file_path = filedialog.askopenfilename(title="Please select an MS1 MSALIGN file", filetypes=[('All files','*.*')])  # Question: Does this still not work on mac?
+            file_path = filedialog.askopenfilenames(title="Please select MS1 MSALIGN file(s)", filetypes=[('All files','*.*')])  # Question: Does this still not work on mac?
 
-            # The abbreviated file name 'filename.msalign' of the uploaded file is extracted from its path '.../.../.../.../filename.msalign'
-            filename = str(file_path)[::-1]        # takes the uploaded file path as a string, reverses it, and saves this to the variable filename
-            for i in range(len(filename)):
-                if filename[i] == '/':
-                    ext_filename = filename[0:i][::-1]    # takes the reversed file path up to the first '/', reversed, and saves this to the variable ext_filename
-                    break
-            ms1ft_filename = str(file_path)[:-12]+'.ms1ft'
-            App.ms1ft_filenames.append(ms1ft_filename)
-            
-            print('ms1ft_filename',ms1ft_filename)
-
-            # Once a file has been successfully uploaded, display in app while:
-                # allowing user to relabel each file, usually by group (e.g. 'exp group', 'ctrl group')
-                # allowing user remove individual uploaded files with a button
-            if ext_filename != "":
-                # displays uploaded file on grid as an (editable - why?) Label object
-                filelabel = Label(self, text = 'File: '+ ext_filename)  # textvariable? to pass to Entry?
-                filelabel.grid(row=FileSelection.gridrow, column=FileSelection.gridcolumn, sticky='w')
-
-                # creates editable group_label_entry, so that the user can specify what each msalign file represents (control, experiment 1, etc) in app
-                # these will be the labels shown on the output graphs
-                group_label_entry = tk.Entry(self, width=13)
-                group_label_entry.grid(row=FileSelection.gridrow, column=int(FileSelection.gridcolumn)+1, sticky='w')
-                group_label_entry.insert(0,'<exp. group>')
-
-                # creates a removebutton alongside & specific to each uploaded file using a lambda that calls the function "Xclick", defined below this fn
-                removebutton = tk.Button(self, text='X', fg="red", command=(lambda : Xclick(filelabel,group_label_entry,removebutton)))
-                removebutton.grid(row=FileSelection.gridrow, column=int(FileSelection.gridcolumn)+2)
-                removebutton_tip = Hovertip(removebutton, 'Remove ' + ext_filename, hover_delay=100)
-
-                # changes to FileSelection page
-                FileSelection.filelabel_identities.append(filelabel)
-                FileSelection.group_identities.append(group_label_entry)
-                FileSelection.button_identities.append(removebutton)
-                FileSelection.gridrow += 1
-                App.total_files+=1
-
-                # update main array by appending file Label and string (why both?)
-                # msalign_filearray = [Label1, string1, Label2, string2, ...]
-                App.msalign_filearray.append(filelabel)
-                # App.msalign_filearray.append(ext_filename)
-                App.msalign_filearray.append(str(file_path))
-
-            # timing start
-            start_time = timeit.default_timer()
-            print(App.msalign_filearray)
+            for file in file_path:
+                # The abbreviated file name 'filename.msalign' of the uploaded file is extracted from its path '.../.../.../.../filename.msalign'
+                filename = str(file)[::-1]        # takes the uploaded file path as a string, reverses it, and saves this to the variable filename
+                for i in range(len(filename)):
+                    if filename[i] == '/':
+                        ext_filename = filename[0:i][::-1]    # takes the reversed file path up to the first '/', reversed, and saves this to the variable ext_filename
+                        break
+                App.shortened_filenames.append(ext_filename)
+                # print(App.shortened_filenames)
+                ms1ft_filename = str(file)[:-12]+'.ms1ft'
+                App.ms1ft_filenames.append(ms1ft_filename)
                 
-            # only show "Process Files" button once there are files to process
-            # pressing the "Process Files" button calls the lambda populate_entries()
-            if len(App.msalign_filearray) == 2:         # if something uploaded, msalign_file array should have 2 vals (file label & name)
-                # spacing around process files button
-                space = tk.Label(self, text="\n")
-                space.grid(column=0, row=20, sticky='w')
-                
-                # process files button
-                processbutton = tk.Button(self, text='Process File(s)', name='processbutton', bg="green", fg="white", command=(lambda : populate_entries()))
-                processbutton.grid(column=0, row=21, sticky='w')
-                process_tip = Hovertip(processbutton, 'Warning! Once processed, files cannot be changed.', hover_delay=100)
+                print('ms1ft_filename',ms1ft_filename)
+
+                # Once a file has been successfully uploaded, display in app while:
+                    # allowing user to relabel each file, usually by group (e.g. 'exp group', 'ctrl group')
+                    # allowing user remove individual uploaded files with a button
+                if ext_filename != "":
+                    # displays uploaded file on grid as an (editable - why?) Label object
+                    filelabel = Label(self, text = 'File: '+ ext_filename)  # textvariable? to pass to Entry?
+                    filelabel.grid(row=FileSelection.gridrow, column=FileSelection.gridcolumn, sticky='w')
+
+                    # creates editable group_label_entry, so that the user can specify what each msalign file represents (control, experiment 1, etc) in app
+                    # these will be the labels shown on the output graphs
+                    group_label_entry = tk.Entry(self, width=13)
+                    group_label_entry.grid(row=FileSelection.gridrow, column=int(FileSelection.gridcolumn)+1, sticky='w')
+                    group_label_entry.insert(0,'<exp. group>')
+
+                    # creates a removebutton alongside & specific to each uploaded file using a lambda that calls the function "Xclick", defined below this fn
+                    removebutton = tk.Button(self, text='X', fg="red", command=(lambda : Xclick(filelabel,group_label_entry,removebutton)))
+                    removebutton.grid(row=FileSelection.gridrow, column=int(FileSelection.gridcolumn)+2)
+                    removebutton_tip = Hovertip(removebutton, 'Remove ' + ext_filename, hover_delay=100)
+
+                    # changes to FileSelection page
+                    FileSelection.filelabel_identities.append(filelabel)
+                    FileSelection.group_identities.append(group_label_entry)
+                    FileSelection.button_identities.append(removebutton)
+                    FileSelection.gridrow += 1
+                    App.total_files+=1
+
+                    # update main array by appending file Label and string (why both?)
+                    # msalign_filearray = [Label1, string1, Label2, string2, ...]
+                    App.msalign_filearray.append(filelabel)
+                    # App.msalign_filearray.append(ext_filename)
+                    App.msalign_filearray.append(str(file))
+
+                # timing start
+                start_time = timeit.default_timer()
+                print(App.msalign_filearray)
+                    
+                # only show "Process Files" button once there are files to process
+                # pressing the "Process Files" button calls the lambda populate_entries()
+                if len(App.msalign_filearray) == 2:         # if something uploaded, msalign_file array should have 2 vals (file label & name)
+                    # spacing around process files button
+                    space = tk.Label(self, text="\n")
+                    space.grid(column=0, row=20, sticky='w')
+                    
+                    # process files button
+                    processbutton = tk.Button(self, text='Process File(s)', name='processbutton', bg="green", fg="white", command=(lambda : populate_entries()))
+                    processbutton.grid(column=0, row=21, sticky='w')
+                    process_tip = Hovertip(processbutton, 'Warning! Once processed, files cannot be changed.', hover_delay=100)
 
         # timing end
         total_time = timeit.default_timer() - start_time
@@ -548,12 +552,12 @@ class SearchParams(tk.Frame):
 
         # STEP 1/2: List your masses of interest below (give your list a name like H3 then list the masses between brackets and separated by commas, as shown).
         H3 = [15168,15182,15196,15210,15224,15238,15252,15266,15280,15294,15308,15322,15336,15350,15364,15378,15392,15406,15430,15444,15458,15472,15486,15500]
-        # H2A = [13488,13530,13572,13545,13587,13629,13700,13742,13784,13713,13755,13797]
+        H2A = [13488,13514,13530,13572,13545,13587,13629,13700,13742,13784,13713,13755,13797]
         # H4 = [11318,11332,11346,11360,11374,11388,11402,11416,11430,11444,11458,11472,11486,11500,11514,11528,11542,11556]
         # H4ox = [11334, 11348, 11362,11376,11390,11404,11418,11432,11446,11460,11474,11488,11502,11516,11530,11544,11558]
 
         # Static mode default values (changeable)
-        default_masses = H3                     # STEP 2/2: Replace H3 in this line with the name of your list.
+        default_masses = H2A                      # STEP 2/2: Replace H3 in this line with the name of your list.
         default_tolerance = 2
         default_scan_start = 100
         default_scan_end = 11111
@@ -669,13 +673,17 @@ class SearchParams(tk.Frame):
 
             space = tk.Label(self.entry_frame, width=20, text='\n', anchor='w').grid(row=i, column=0, sticky='w')
             i+=1
-
-            # I might want to redo this in the future because I feel like making & saving the fields 'Start ret. time' and 'End ret. time' along with each entry in this list is a little redundant, and I'm not sure how much space tkinter field objects take up, but not having them would save that space and some searching time when we use this list (which we do a lot). The downside is that we use this a lot so it might take some time to untangle. I also think it would just look nicer with 'Start...' and 'End...' as headers and just the entries in two columns, but it's not important. 
-            # On the same note, I'm not sure the file names are necessary either, but maybe they're used in graphing (I should check). If not, we could save the space taken up by those labels too.
+            count = 0
+            # Build entries & fields for Start & End Ret. Time (per file)
             for file in SearchParams.abrv_filenames:
-                lab = tk.Label(self.entry_frame, width=20, text=str(file), anchor='w')
+                print('FILENAMES')
+                print(App.shortened_filenames)
+                print('FILENAMES')
+                # build and place labels for each file
+                # lab = tk.Label(self.entry_frame, width=20, text=str(file), anchor='w')
+                lab = tk.Label(self.entry_frame, width=20, text=str(App.shortened_filenames[count]), anchor='w')
                 lab.grid(row=i, column=0,columnspan=3,sticky='news')
-                SearchParams.dynamic_entries.append(file)
+                SearchParams.dynamic_entries.append(file)       # append filename (String?) to dynamic_entries
                 j=2
                 for field in d_fields:
                     lab = tk.Label(self.entry_frame, width=20, text=field, anchor='w')
@@ -690,6 +698,7 @@ class SearchParams(tk.Frame):
                     SearchParams.dynamic_entries.append((field, ent))
                     j+=2
                 i+=1
+                count+=1
 
             # Inserts default parameters into entries (Dynamic mode)
             # Masses / Mass Range and Mass Tolerance
@@ -975,15 +984,16 @@ class SearchParams(tk.Frame):
         if type(input_masses[0]) == str:                # input_masses = list of masses as strings, why if?
             masses = []
             for idx, val in enumerate(input_masses):
-                if val == ',' or val == ' ':
+                if val == ',' or val == ' ' and len(convert) !=0:
                     link = "".join(convert)
-                    pool.append(link)
+                    pool.append(float(link))
                     convert = []
                 elif idx == (len(input_masses)-1) and input_masses[idx].isnumeric():
+                    print('inpmassidx', input_masses[idx])
                     convert.append(input_masses[idx])
                     link = "".join(convert)
                     pool.append(link)
-                else:
+                elif val.isnumeric() or val == '.':
                     convert.append(val)
 
             for i in pool:
@@ -1390,7 +1400,7 @@ class QCGraphs(tk.Frame):
             p.add_layout(legend,'right')
             p.legend.click_policy="hide"
             qc_plots.append(p)
-            tab_temp = Panel(child=p, title=ext_filename)
+            tab_temp = TabPanel(child=p, title=ext_filename)
             tab.append(tab_temp)
             del p
         
@@ -1398,18 +1408,9 @@ class QCGraphs(tk.Frame):
         filename = "MS1_quant_graphs"+"_"+date+".html"      # names qcgraph file by date
         output_file(filename)                               # from bokeh, outputs file containing quant graphs \
 
-        # make a grid
-
-        #grid = gridplot([averaged_plot,Tabs(tabs=tab, tabs_location='left')], merge_tools = False, toolbar_location="left", width=800, height=500)
-
-        div = Div(text='Testing')
-        
-        
+        # make a graphical layout of all plots        
         layout = row(averaged_plot,Tabs(tabs=tab, tabs_location='above'), Tabs(tabs=VisualizeMS1FT.make_ms1ft_graphs(ext_filename),tabs_location='above'), sizing_mode = "stretch_width")
         show(layout)
-
-
-        #VisualizeMS1FT.make_ms1ft_graphs()
 
         ''' TO DO once "New Analysis" button fixed, move this there '''
         # clear out graphing data
@@ -1428,10 +1429,7 @@ class QCGraphs(tk.Frame):
 
 class VisualizeMS1FT():
     
-    print('done')
-
     def make_ms1ft_graphs(ext_filename):
-        print('called')
         ms1ft_graphs = []
         for file in App.ms1ft_filenames:
             print(file)
@@ -1440,62 +1438,62 @@ class VisualizeMS1FT():
                 df_ms1ft = pd.read_csv(file,sep='\t')     # reads input file (tab delimited) into a pandas dataframe
                 if df_ms1ft.columns[0] != "FeatureID":          # to make sure the file was formatted correctly, check that the first column heading is "FeatureID"
                     mb.showerror("File Error", "Check the MS1FT file: Expected 'FeatureID' as first column!") # question: is this the only column we should check?
-                    sys.exit()
+                    #sys.exit()
                 else:
                     df_ms1ft = df_ms1ft.sort_values(by='MonoMass').set_index(keys='MonoMass')   # sets the 'MonoMass' datapoint as the key for its corresponding data, and sorts the dataframe by it
 
-                output_file("featuremap_"+ext_filename+".html", mode='inline')
-                VisualizeMS1FT.envelope_histogram(df_ms1ft)                                     # forms envelope histogram out of sorted dataframe containing ms1ft file data
+                    date = datetime.today().strftime('%Y%m%d_%H%M%S')   # calculate exact time/date
+                    
+                    output_file("featuremap_"+date+".html", mode='inline')
+                    VisualizeMS1FT.envelope_histogram(df_ms1ft)                                     # forms envelope histogram out of sorted dataframe containing ms1ft file data
 
-                source = ColumnDataSource(df_ms1ft)
-                source2 = ColumnDataSource(data=dict(x=[], y=[]))
+                    source = ColumnDataSource(df_ms1ft)
+                    source2 = ColumnDataSource(data=dict(x=[], y=[]))
 
-                colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
-                mapper = LogColorMapper(palette=colors, low=df_ms1ft['Abundance'].min(), high=df_ms1ft['Abundance'].max())
+                    colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
+                    mapper = LogColorMapper(palette=colors, low=df_ms1ft['Abundance'].min(), high=df_ms1ft['Abundance'].max())
 
-                p = figure(title="Feature Map of "+ext_filename,
-                           x_range=(0,df_ms1ft['MaxElutionTime'].max()+1), y_range=(0,30000), #y_range=(0,df_ms1ft.index.max()+1) = this will scale to largest mass identified, really impratical so i set to 30,000
-                           toolbar_location="right",  x_axis_location="below",active_drag="box_zoom",active_scroll="wheel_zoom",)
+                    p = figure(title="Feature Map of "+ext_filename,
+                               x_range=(0,df_ms1ft['MaxElutionTime'].max()+1), y_range=(0,30000), #y_range=(0,df_ms1ft.index.max()+1) = this will scale to largest mass identified, really impratical so i set to 30,000
+                               toolbar_location="right",  x_axis_location="below",active_drag="box_zoom",active_scroll="wheel_zoom",)
 
-                iso_distrib = figure(width = 500, height = 400, title="Isotopic Distribution",x_axis_label="C13", tools="pan,box_zoom,wheel_zoom,reset,undo,save",
-                                    active_scroll="wheel_zoom",y_axis_label="Rel. Abundance", active_drag="box_zoom")
-                 
-                z = iso_distrib.vbar(x='x', width=0.5, bottom=0, top='y', color="red", source=source2)
+                    iso_distrib = figure(width = 500, height = 400, title="Isotopic Distribution",x_axis_label="C13", tools="pan,box_zoom,wheel_zoom,reset,undo,save",
+                                        active_scroll="wheel_zoom",y_axis_label="Rel. Abundance", active_drag="box_zoom")
+                     
+                    z = iso_distrib.vbar(x='x', width=0.5, bottom=0, top='y', color="red", source=source2)
 
 
-                mass = p.rect(x="MinElutionTime", y="MonoMass", width='ElutionLength', height=10, source=source,
-                       line_color=None, fill_color=transform('Abundance', mapper))
+                    mass = p.rect(x="MinElutionTime", y="MonoMass", width='ElutionLength', height=10, source=source,
+                           line_color=None, fill_color=transform('Abundance', mapper))
 
-                p.add_tools(TapTool())
+                    p.add_tools(TapTool())
 
-                p.js_on_event(Tap, CustomJS(args=dict(source=source, source2=source2,title=iso_distrib.title), code="""
-                    // get data source from Callback args
-                    let data = Object.assign({}, source.data);
-                    source2.data.x = data.C13[source.selected.indices];
-                    source2.data.y = data.IsoAbd[source.selected.indices];
-                    title.text = 'Isotopic Distribution for: '+(new String(data.MonoMass[source.selected.indices]));
-                    source2.change.emit();
-                """)
-                )
+                    p.js_on_event(Tap, CustomJS(args=dict(source=source, source2=source2,title=iso_distrib.title), code="""
+                        // get data source from Callback args
+                        let data = Object.assign({}, source.data);
+                        source2.data.x = data.C13[source.selected.indices];
+                        source2.data.y = data.IsoAbd[source.selected.indices];
+                        title.text = 'Isotopic Distribution for: '+(new String(data.MonoMass[source.selected.indices]));
+                        source2.change.emit();
+                    """)
+                    )
 
-                color_bar = ColorBar(color_mapper=mapper, title="Log Abundance")
+                    color_bar = ColorBar(color_mapper=mapper, title="Log Abundance")
 
-                p.add_layout(color_bar, 'right')
-                p.axis.axis_line_color = None
-                p.axis.major_tick_line_color = None
-                p.xaxis.axis_label = 'Retention Time (min)'
-                p.yaxis.axis_label = 'Monoisotopic Mass'
-                p.axis.major_label_text_font_size = "20px"
-                p.axis.major_label_standoff = 0
-                p.xaxis.major_label_orientation = 1.0
-                p.axis.axis_label_text_font_size = "20px"
+                    p.add_layout(color_bar, 'right')
+                    p.axis.axis_line_color = None
+                    p.axis.major_tick_line_color = None
+                    p.xaxis.axis_label = 'Retention Time (min)'
+                    p.yaxis.axis_label = 'Monoisotopic Mass'
+                    p.axis.major_label_text_font_size = "20px"
+                    p.axis.major_label_standoff = 0
+                    p.xaxis.major_label_orientation = 1.0
+                    p.axis.axis_label_text_font_size = "20px"
 
-                temp = layout([p, iso_distrib])
-                tab = Panel(child=temp, title=ext_filename)
-                ms1ft_graphs.append(tab)
+                    temp = layout([p, iso_distrib])
+                    tab = TabPanel(child=temp, title=ext_filename)
+                    ms1ft_graphs.append(tab)
                 
-            else:
-                print('not found!') 
         return ms1ft_graphs
 
     # Function Name: Envelope Histogram
