@@ -72,7 +72,7 @@ from tkinter import *                           # remove and test
 from collections.abc import Iterable
     # Iterable: provides abstract base classes that can be used to test whether a class
     # provides a particular interface, so like issubclass() or isinstance()
-from bokeh.models import ColumnDataSource, Whisker, HoverTool, Legend, LegendItem, Tabs, Div, BasicTicker, ColorBar, CustomJS, TapTool, LogColorMapper, PrintfTickFormatter, TabPanel
+from bokeh.models import ColumnDataSource, Whisker, HoverTool, Legend, LegendItem, Tabs, Div, BasicTicker, ColorBar, CustomJS, TapTool, LogColorMapper, PrintfTickFormatter, TabPanel, Dropdown
     # ColumnDataSource: provides data to the glyphs of plot so you can pass in lists, etc.
     # Whisker: adds a whisker for error margins
     # HoverTool: passive inspector tool, for actions to occur when cursor hovering
@@ -112,7 +112,7 @@ from tkinter import filedialog
 # from tktooltip import ToolTip
 from idlelib.tooltip import Hovertip
 import math
-from pathlib import Path
+from functools import reduce
 
 LARGE_FONT= ("Verdana", 12)
 
@@ -279,7 +279,7 @@ class TestApp(tk.Frame):
         test_fields = ['Number of files']
         i=2
         for field in test_fields:
-            lab = tk.Label(self.entry_frame, width=20, text=field, anchor='w')
+            lab = tk.Label(self.entry_frame, width=len(field), text=field, anchor='w')
             ent = tk.Entry(self.entry_frame, width=8)
             lab.grid(row=i, column=0)
             ent.grid(row=i, column=1, sticky='w')
@@ -363,7 +363,7 @@ class FileSelection(tk.Frame):
                     # allowing user remove individual uploaded files with a button
                 if ext_filename != "":
                     # displays uploaded file on grid as an (editable - why?) Label object
-                    filelabel = Label(self, text = 'File: '+ ext_filename)  # textvariable? to pass to Entry?
+                    filelabel = Label(self, text = 'File: '+ ext_filename, anchor="w", width=len(ext_filename)+5)  # textvariable? to pass to Entry?
                     filelabel.grid(row=FileSelection.gridrow, column=FileSelection.gridcolumn, sticky='w')
 
                     # creates editable group_label_entry, so that the user can specify what each msalign file represents (control, experiment 1, etc) in app
@@ -415,7 +415,9 @@ class FileSelection(tk.Frame):
 
 
         # XCLICK(): destroys all info for a selected file in FileSelection page (filelabel, entry box, removebutton) and the corresponding values in the identity arrays for those 3 values. Then destroys its 2 values in msalign_filearray and updates the app's total number of files, removing the "Process Files" button if this is 0. The result is as though the selected file was never uploaded.
+        # THIS DOES NOT WORK WHEN MULTIPLE FILES ARE SELECTED AT ONCE. I THINK THE filelabel VARIABLE DOES NOT BECOME A UNIQUE IDENTIFIER!!!
         def Xclick(filelabel, group_label_entry, removebutton):
+            print('Xclick array: ',filelabel)
             # timing start
             start_time = timeit.default_timer()
 
@@ -602,7 +604,7 @@ class SearchParams(tk.Frame):
 
             # for each entry in Static Mode, enter the field name and entry as a pair into SearchParams.entries
             for field in s_fields:
-                lab = tk.Label(self.entry_frame, width=20, text=field, anchor='w')
+                lab = tk.Label(self.entry_frame, width=len(field), text=field, anchor='w')
                 ent = tk.Entry(self.entry_frame, width=8)
                 lab.grid(row=i, column=0,sticky='news')
                 ent.grid(row=i, column=1,sticky='w')
@@ -644,7 +646,7 @@ class SearchParams(tk.Frame):
 
             # 'Masses' field either serves as a mass list OR the min mass for search by mass range
             self.mass_field = tk.Label(self.entry_frame, width=25, text='Masses', anchor='w')
-            self.mass_field_ent = tk.Entry(self.entry_frame, width=8)
+            self.mass_field_ent = tk.Entry(self.entry_frame, width=len("".join(map(str,default_masses)))+len(default_masses))
             self.mass_field.grid(row=3, column=0,sticky='news')
             self.mass_field_ent.grid(row=3, column=1,sticky='w')
             tip = Hovertip(self.mass_field_ent, 'List masses of interest. \nSeparate each mass with either \na space or a comma and a space.', hover_delay=100)
@@ -663,7 +665,7 @@ class SearchParams(tk.Frame):
 
             i=4 
             for field in s_fields:
-                lab = tk.Label(self.entry_frame, width=20, text=field, anchor='w')
+                lab = tk.Label(self.entry_frame, width=len(field)+5, text=field, anchor='e')
                 ent = tk.Entry(self.entry_frame, width=8)
                 lab.grid(row=i, column=0,sticky='news')
                 ent.grid(row=i, column=1,sticky='w')
@@ -681,12 +683,12 @@ class SearchParams(tk.Frame):
                 print('FILENAMES')
                 # build and place labels for each file
                 # lab = tk.Label(self.entry_frame, width=20, text=str(file), anchor='w')
-                lab = tk.Label(self.entry_frame, width=20, text=str(App.shortened_filenames[count]), anchor='w')
+                lab = tk.Label(self.entry_frame, width=len(App.shortened_filenames[count]), text=str(App.shortened_filenames[count]), anchor='w')
                 lab.grid(row=i, column=0,columnspan=3,sticky='news')
                 SearchParams.dynamic_entries.append(file)       # append filename (String?) to dynamic_entries
                 j=2
                 for field in d_fields:
-                    lab = tk.Label(self.entry_frame, width=20, text=field, anchor='w')
+                    lab = tk.Label(self.entry_frame, width=len(field), text=field, anchor='w')
                     ent = tk.Entry(self.entry_frame, width=8)
                     lab.grid(row=i, column=j, columnspan=1, sticky='news')
                     ent.grid(row=i, column=j+1, sticky='w')
@@ -754,7 +756,7 @@ class SearchParams(tk.Frame):
             # Warning: Overlap between 'Mass Interval' and 'Mass Tolerance'
             # The mass interval must be more than twice as large as the mass tolerance, otherwise one datapoint may be counted towards two neighboring masses of interest. Once we have the above issue fixed we can put this in the same for loop as checking the entries above and won't need  so many if statements.
             if self.mass_range.get() == 1:
-                if (int(SearchParams.entries[1][1].get()) >= math.ceil(int(SearchParams.entries[0][3].get())/2)):
+                if (float(SearchParams.entries[1][1].get()) >= math.ceil(float(SearchParams.entries[0][3].get())/2)):
                     mb.showerror("Warning", "Overlap between mass interval and mass tolerance.\nInterval must be more than twice as large as tolerance.")
                     error = True
 
@@ -1308,7 +1310,7 @@ class QCGraphs(tk.Frame):
 
         # averaged plot displayed first
         averaged_plot = figure(title="Averaged MS1 Data per Condition", x_axis_label="Mass", y_axis_label="Abundance (%)", tools="pan,box_zoom,wheel_zoom,reset,undo,save", active_drag="box_zoom",
-                               active_scroll="wheel_zoom", x_range=((min(QCGraphs.masses)-100), (max(QCGraphs.masses)+100)),tooltips=TOOLTIPS, width=400)
+                               active_scroll="wheel_zoom", x_range=((min(QCGraphs.masses)-100), (max(QCGraphs.masses)+100)),tooltips=TOOLTIPS, height=500)
 
         # convert searched masses to string values for legend
         for i in QCGraphs.masses:
@@ -1362,7 +1364,7 @@ class QCGraphs(tk.Frame):
                     break
 
             p = figure(title="QC Graph for "+ext_filename,x_axis_label="Ret. time(s)", tools="pan,box_zoom,wheel_zoom,reset,undo,save",
-                       active_scroll="wheel_zoom",y_axis_label="Intensity", tooltips=TOOLTIPSQC, active_drag="box_zoom")
+                       active_scroll="wheel_zoom",y_axis_label="Intensity", tooltips=TOOLTIPSQC, active_drag="box_zoom", height=500)
             offset = .25
             v=[]
             for i in QCGraphs.masses:                           # for each mass... is this ret time?
@@ -1408,8 +1410,37 @@ class QCGraphs(tk.Frame):
         filename = "MS1_quant_graphs"+"_"+date+".html"      # names qcgraph file by date
         output_file(filename)                               # from bokeh, outputs file containing quant graphs \
 
-        # make a graphical layout of all plots        
-        layout = row(averaged_plot,Tabs(tabs=tab, tabs_location='above'), Tabs(tabs=VisualizeMS1FT.make_ms1ft_graphs(ext_filename),tabs_location='above'), sizing_mode = "stretch_width")
+        # make a graphical layout of all plots
+        stylesheet = """
+        :host(.bk-Tabs) .bk-header {
+          font-size: 15px;
+          max-width: 500px;
+          overflow: hidden;
+          border-color: orange;
+        }
+
+        .bk-tab {
+            padding: 2px 3px;
+            border: solid transparent;
+            outline: 0;
+            outline-offset: -5px;
+            white-space: nowrap;
+            cursor: pointer;
+            text-align: center;
+            max-width: 30px;
+            border-color: orange;
+            overflow: hidden;
+        }
+
+        .bk-tab.bk-active {
+          font-size: 15px;
+          max-width: 500px;
+          overflow: hidden;
+          background-color: orange;
+        }
+        """
+        
+        layout = row(averaged_plot,Tabs(tabs=tab, tabs_location='above', stylesheets=[stylesheet]),Tabs(tabs=VisualizeMS1FT.make_ms1ft_graphs(ext_filename),tabs_location='above',stylesheets=[stylesheet]))
         show(layout)
 
         ''' TO DO once "New Analysis" button fixed, move this there '''
@@ -1447,23 +1478,32 @@ class VisualizeMS1FT():
                     output_file("featuremap_"+date+".html", mode='inline')
                     VisualizeMS1FT.envelope_histogram(df_ms1ft)                                     # forms envelope histogram out of sorted dataframe containing ms1ft file data
 
+                    #Autopopulate istopic distribution histogram with that of the most abundant ion
+                    max_abd_idx = df_ms1ft['Abundance'].idxmax()
+                    max_abd_C13 = df_ms1ft['C13'].loc[max_abd_idx]
+                    max_abd_IsoAbd = df_ms1ft['IsoAbd'].loc[max_abd_idx]                    
+                    initial_data = {'x': max_abd_C13, 'y':max_abd_IsoAbd}
+                                    
                     source = ColumnDataSource(df_ms1ft)
-                    source2 = ColumnDataSource(data=dict(x=[], y=[]))
+                    source2 = ColumnDataSource(initial_data)
+
+
 
                     colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
                     mapper = LogColorMapper(palette=colors, low=df_ms1ft['Abundance'].min(), high=df_ms1ft['Abundance'].max())
 
                     p = figure(title="Feature Map of "+ext_filename,
                                x_range=(0,df_ms1ft['MaxElutionTime'].max()+1), y_range=(0,30000), #y_range=(0,df_ms1ft.index.max()+1) = this will scale to largest mass identified, really impratical so i set to 30,000
-                               toolbar_location="right",  x_axis_location="below",active_drag="box_zoom",active_scroll="wheel_zoom",)
+                               toolbar_location="right",  x_axis_location="below",active_drag="box_zoom",active_scroll="wheel_zoom", height=300)
 
-                    iso_distrib = figure(width = 500, height = 400, title="Isotopic Distribution",x_axis_label="C13", tools="pan,box_zoom,wheel_zoom,reset,undo,save",
-                                        active_scroll="wheel_zoom",y_axis_label="Rel. Abundance", active_drag="box_zoom")
+                    
+                    iso_distrib = figure(title="Isotopic Distribution for: "+str(max_abd_idx),x_axis_label="C13", tools="pan,box_zoom,wheel_zoom,reset,undo,save",
+                                        active_scroll="wheel_zoom",y_axis_label="Rel. Abundance", active_drag="box_zoom", height=200)
                      
                     z = iso_distrib.vbar(x='x', width=0.5, bottom=0, top='y', color="red", source=source2)
 
 
-                    mass = p.rect(x="MinElutionTime", y="MonoMass", width='ElutionLength', height=10, source=source,
+                    mass = p.rect(x="MinElutionTime", y="MonoMass", width='ElutionLength', height=2, source=source,
                            line_color=None, fill_color=transform('Abundance', mapper))
 
                     p.add_tools(TapTool())
