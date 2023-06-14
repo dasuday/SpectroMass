@@ -329,7 +329,7 @@ class FileSelection(tk.Frame):
         # Add File Button
         addbutton = tk.Button(self, text='Add File',  fg="green", command=(lambda : self.msalignfile()))
         addbutton.grid(column=0, row=2,sticky='w')
-        addbutton_tip = Hovertip(addbutton, 'Upload a file\n(.msalign)', hover_delay=100)
+        addbutton_tip = Hovertip(addbutton, 'Upload a file\n(.msalign or .tsv)', hover_delay=100)
 
         self.controller = controller
 
@@ -342,7 +342,7 @@ class FileSelection(tk.Frame):
             
         else:
             # Retrieve file path from upload
-            file_path = filedialog.askopenfilenames(title="Please select MS1 MSALIGN file(s)", filetypes=[('All files','*.*')])  # Question: Does this still not work on mac?
+            file_path = filedialog.askopenfilenames(title="Please select MS1 msAlign or tsv file(s)", filetypes=[('All files','*.*')])  # Question: Does this still not work on mac?
 
             for file in file_path:
                 # The abbreviated file name 'filename.msalign' of the uploaded file is extracted from its path '.../.../.../.../filename.msalign'
@@ -352,12 +352,12 @@ class FileSelection(tk.Frame):
                         ext_filename = filename[0:i][::-1]    # takes the reversed file path up to the first '/', reversed, and saves this to the variable ext_filename
                         break
                 App.shortened_filenames.append(ext_filename)
-                # print(App.shortened_filenames)
-                ms1ft_filename = str(file)[:-12]+'.ms1ft'
+
+                #make ms1ft filname
+                root_ext = os.path.splitext(file)
+                ms1ft_filename = root_ext[0][:-4]+'.ms1ft'
                 App.ms1ft_filenames.append(ms1ft_filename)
                 
-                print('ms1ft_filename',ms1ft_filename)
-
                 # Once a file has been successfully uploaded, display in app while:
                     # allowing user to relabel each file, usually by group (e.g. 'exp group', 'ctrl group')
                     # allowing user remove individual uploaded files with a button
@@ -392,7 +392,6 @@ class FileSelection(tk.Frame):
 
                 # timing start
                 start_time = timeit.default_timer()
-                print(App.msalign_filearray)
                     
                 # only show "Process Files" button once there are files to process
                 # pressing the "Process Files" button calls the lambda populate_entries()
@@ -865,77 +864,87 @@ class SearchParams(tk.Frame):
             return "".join(getVals)
 
         # Read input file as one massive string
-        with open(filename) as fp:
-            data = fp.read()
+        root_ext = os.path.splitext(filename)
+        if root_ext[1] == '.msalign':
+            with open(filename) as fp:
+                data = fp.read()
 
-        # Read through the string obtained from the file and sort it into "lines". 
-        # Lines consist of the data between each comma or newline character. 
-        for i in data:
-            if i == ',' or i == '\n':
-                link = "".join(convert)
-                link.strip()
-                if len(link) > 1:
-                    lines.append(link)
-                    convert = []
-            else:
-                convert.append(i)
+            # Read through the string obtained from the file and sort it into "lines". 
+            # Lines consist of the data between each comma or newline character. 
+            for i in data:
+                if i == ',' or i == '\n':
+                    link = "".join(convert)
+                    link.strip()
+                    if len(link) > 1:
+                        lines.append(link)
+                        convert = []
+                else:
+                    convert.append(i)
 
-        # Extract numerical data from lines using rmv_chars(), defined above. 
-        # By inspection, the data in the input (.msalign) files is in the form:
-            # BEGIN IONS
-            # ID=int
-            # SCANS=int
-            # RETENTION_TIME=float
-            # ACTIVATION= 
-            # float float int (ion 1 data?)
-            # float float int (ion 2 data?)
-            # ...
-            # END IONS
-            #
-            # (repeat above)
-        # So we use these headers (and a temp array) to sort the appropriate data into ms1_ions and scan_ions.
-        # Question: Is this the exact format every time? If so we can probably rewrite the following loop to be a bit more efficient.
-        while (len(lines)-1)>0:
-            text = str(lines[0])
-            if text.startswith('ID='):
-                temp_array[0] = int(rmv_chars(text))        # append id no. to temp array
-                self.update()
-            elif text.startswith('SCANS='):                 # append scan no. to temp array
-                temp_array[1] = int(rmv_chars(text))
-            elif text.startswith('RETENTION_TIME='):        # append ret. time to temp array
-                temp_array[2] = float(rmv_chars(text))
-            elif text[0].isdigit():
-                while lines[0]!='END IONS':
-                    ms1_ions = np.append(ms1_ions,[float(s) for s in lines[0].split("\t")])     # append ions to ms1_ions
-                    del lines[0]
-                ms1_ions = np.reshape(ms1_ions,(int(len(ms1_ions)/3),3))    # each element now contains 3 pieces of data for an ion, the start and end times and the intensity?
-                temp_array[3] = ms1_ions
-                scan_ions.append(temp_array)
-                temp_array = [0,0,0,0]
-                ms1_ions = []
-                ms1events+=1
-            del lines[0]
-        
-        # timing end (end timing before calling next function)
-        total_time = timeit.default_timer() - start_time
-        print('SearchParams \t process \t\t\t', total_time)
-        # with open("timing_0_progress.csv", "a") as out_file:        # timing output file for testing
-            # out_file.write(str(total_time))
-            # out_file.write("\n")
+            # Extract numerical data from lines using rmv_chars(), defined above. 
+            # By inspection, the data in the input (.msalign) files is in the form:
+                # BEGIN IONS
+                # ID=int
+                # SCANS=int
+                # RETENTION_TIME=float
+                # ACTIVATION= 
+                # float float int (ion 1 data?)
+                # float float int (ion 2 data?)
+                # ...
+                # END IONS
+                #
+                # (repeat above)
+            # So we use these headers (and a temp array) to sort the appropriate data into ms1_ions and scan_ions.
+            # Question: Is this the exact format every time? If so we can probably rewrite the following loop to be a bit more efficient.
+            while (len(lines)-1)>0:
+                text = str(lines[0])
+                if text.startswith('ID='):
+                    temp_array[0] = int(rmv_chars(text))        # append id no. to temp array
+                    self.update()
+                elif text.startswith('SCANS='):                 # append scan no. to temp array
+                    temp_array[1] = int(rmv_chars(text))
+                elif text.startswith('RETENTION_TIME='):        # append ret. time to temp array
+                    temp_array[2] = float(rmv_chars(text))
+                elif text[0].isdigit():
+                    while lines[0]!='END IONS':
+                        ms1_ions = np.append(ms1_ions,[float(s) for s in lines[0].split("\t")])     # append ions to ms1_ions
+                        del lines[0]
+                    ms1_ions = np.reshape(ms1_ions,(int(len(ms1_ions)/3),3))    # each element now contains 3 pieces of data for an ion, the start and end times and the intensity?
+                    temp_array[3] = ms1_ions
+                    scan_ions.append(temp_array)
+                    temp_array = [0,0,0,0]
+                    ms1_ions = []
+                    ms1events+=1
+                del lines[0]
+            
+            # timing end (end timing before calling next function)
+            total_time = timeit.default_timer() - start_time
+            print('SearchParams \t process \t\t\t', total_time)
+            # with open("timing_0_progress.csv", "a") as out_file:        # timing output file for testing
+                # out_file.write(str(total_time))
+                # out_file.write("\n")
 
-        # Perform mass selection (defined below) on scan ions
-        SearchParams.mass_selection(self,scan_ions)
-        
+            # Perform mass selection (defined below) on scan ions
+            SearchParams.mass_selection(self,scan_ions,root_ext[1])
+
+        elif root_ext[1] == '.tsv':
+            req_columns = ['Index','ScanNum','RetentionTime','MonoisotopicMass','SumIntensity']
+            df_tsv = pd.read_csv(filename,usecols=req_columns,sep='\t')
+            SearchParams.mass_selection(self,df_tsv,root_ext[1])
+
+        else:
+             mb.showerror("Warning","File extension not .msalign or .tsv. Closing program.")
+             sys().exit
         
     # MASS_SELECTION(): given scan_ions array from process(), where
-    # scan_ions = [[[ID, SCANS, RETENTION_TIME, [Mass, Intensity, Charge]]],...],
+    # scan_ions = [[[ID, SCANS, RETENTION_TIME, [Mass, Intensity, Charge]],...],
         # gathers parameter data from user input
         # converts all mass data (idx, val) from string to float
         # forms found_masses, masses, tolerance arrays from mass data & parameters, where 
             # found_masses = 
             # masses = 
             # tolerance = 
-    def mass_selection(self,scan_ions):
+    def mass_selection(self,scan_ions,root_ext):
         # timing start
         start_time = timeit.default_timer()
 
@@ -968,7 +977,6 @@ class SearchParams(tk.Frame):
                 while temp_mass <= max_mass:
                     temp_mass+=mass_interval
                     input_masses.append(temp_mass)
-                # print('mass range=',input_masses)
                 input_masses = str(input_masses)                        # not sure
             else:                                                       # if 'Search by masses' not selected
                 input_masses = str(SearchParams.entries[0][1].get())    # only additional data to gather is
@@ -991,7 +999,6 @@ class SearchParams(tk.Frame):
                     pool.append(float(link))
                     convert = []
                 elif idx == (len(input_masses)-1) and input_masses[idx].isnumeric():
-                    print('inpmassidx', input_masses[idx])
                     convert.append(input_masses[idx])
                     link = "".join(convert)
                     pool.append(link)
@@ -1003,21 +1010,39 @@ class SearchParams(tk.Frame):
 
         # Search through scan_ion array using parameters above and output array
         # [retention time, mass, intensity] for each mass in the array.
-        for i in scan_ions:
-            if scan_min <= (i[1]) <= scan_max and retention_min <= (i[2]) <= retention_max:
-                for l in i[3]:
-                    temp_array = []
-                    graph_temp_array = []
-                    for mass in masses:
-                        if (mass - mass_tolerance) <= l[0] <= (mass + mass_tolerance):
-                            temp_array.extend((i[2],l[0],l[1]))
+        if root_ext == ".msalign":
+            for i in scan_ions:
+                if scan_min <= (i[1]) <= scan_max and retention_min <= (i[2]) <= retention_max:
+                    for l in i[3]:
+                        temp_array = []
+                        graph_temp_array = []
+                        for mass in masses:
+                            if (mass - mass_tolerance) <= l[0] <= (mass + mass_tolerance):
+                                temp_array.extend((i[2],l[0],l[1]))
+                                found_masses.append(temp_array)
+                                graph_temp_array.extend((i[2],l[0],l[1]))
+                                graph_found_masses.append(graph_temp_array)
+                    if len(graph_temp_array) == 0:
+                        for mass in masses:
+                            graph_found_masses.append(([i[2],mass,0]))
+        elif root_ext == ".tsv":
+            for i, row in scan_ions.iterrows():
+                for mass in masses:
+                    if (mass - mass_tolerance) <= row['MonoisotopicMass'] <= (mass + mass_tolerance):
+                        if scan_min <= row['ScanNum'] <= scan_max and retention_min <= row['RetentionTime'] <= retention_max:
+                            temp_array = []
+                            graph_temp_array = []
+                            temp_array.extend((row['RetentionTime'],row['MonoisotopicMass'],row['SumIntensity']))
                             found_masses.append(temp_array)
-                            graph_temp_array.extend((i[2],l[0],l[1]))
+                            graph_temp_array.extend((row['RetentionTime'],row['MonoisotopicMass'],row['SumIntensity']))
                             graph_found_masses.append(graph_temp_array)
-                if len(graph_temp_array) == 0:
-                    for mass in masses:
-                        graph_found_masses.append(([i[2],mass,0]))
 
+            #huge savings in time and file size here! instead of adding a blank intensity for each mass at each retention time, i added a blank value for
+            #each mass at the min and max retention time for each mass. Bokeh still plots the entire elution window, which was the purpose in the first place!
+            for mass in masses:
+                graph_found_masses.append([scan_ions['RetentionTime'].min(),mass,0])
+                graph_found_masses.append([scan_ions['RetentionTime'].max(),mass,0])
+   
         # Perform mass quantification on found masses
         SearchParams.mass_quantification(self,found_masses, masses, mass_tolerance)
 
@@ -1430,6 +1455,7 @@ class QCGraphs(tk.Frame):
             max-width: 30px;
             border-color: orange;
             overflow: hidden;
+            text-wrap: wrap;
         }
 
         .bk-tab.bk-active {
@@ -1469,10 +1495,16 @@ class VisualizeMS1FT():
                 df_ms1ft = pd.read_csv(file,sep='\t')     # reads input file (tab delimited) into a pandas dataframe
                 if df_ms1ft.columns[0] != "FeatureID":          # to make sure the file was formatted correctly, check that the first column heading is "FeatureID"
                     mb.showerror("File Error", "Check the MS1FT file: Expected 'FeatureID' as first column!") # question: is this the only column we should check?
-                    #sys.exit()
                 else:
                     df_ms1ft = df_ms1ft.sort_values(by='MonoMass').set_index(keys='MonoMass')   # sets the 'MonoMass' datapoint as the key for its corresponding data, and sorts the dataframe by it
+                    #need to convert times from min to sec
+                    #df_ms1ft["ElutionLength"]=np.where(df_ms1ft["ElutionLength"]*60)
+                    #df_ms1ft["MaxElutionTime"]=np.where(df_ms1ft["MaxElutionTime"]*60)
+                    #df_ms1ft["MinElutionTime"]=np.where(df_ms1ft["MinElutionTime"]*60)
+                    cols = ['ElutionLength','MaxElutionTime','MinElutionTime']
+                    df_ms1ft[cols] = df_ms1ft[cols].multiply(60)
 
+                                          
                     date = datetime.today().strftime('%Y%m%d_%H%M%S')   # calculate exact time/date
                     
                     output_file("featuremap_"+date+".html", mode='inline')
